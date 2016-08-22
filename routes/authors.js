@@ -26,6 +26,26 @@ router.get('/', function(req, res, next) {
   // pass an array of authors to the view using locals
 
   // EXAMPLE: { first_name: 'Laura', last_name: 'Lou', bio: 'her bio', books: [ this should be all of her book objects ]}
+		// console.log(authors);
+		var arr = [];
+		Authors().then(function(authors){
+		for (var i = 0; i < authors.length; i++) {
+			arr.push(Authors().pluck('id').where('id', authors[i].id).then(function(all){
+				return Authors_Books().whereIn('author_id', all).pluck('book_id').then(function(books){
+				return Books().whereIn('id', books).then(function(bookName){
+						return bookName;
+					})
+				})
+			}))
+		}
+		Promise.all(arr).then(function(data){
+			var result = authors.map(function(val, i){
+				val.books = data[i];
+				return val;
+			})
+			res.render('authors/index', {authors: result})
+		})
+	})
 });
 
 router.get('/new', function(req, res, next) {
@@ -88,6 +108,17 @@ router.get('/:id', function (req, res, next) {
   // get all of the authors books from BOOKs
   // render the corresponding template
   // use locals to pass books and author to the view
+	var promises = [];
+	promises.push(Authors().where({id: req.params.id}))
+
+	promises.push(Authors_Books().pluck('book_id').where({author_id: req.params.id}).then(function(bookId){
+			return Books().whereIn('id', bookId).then(function(books){
+				return books;
+		})
+	}))
+	Promise.all(promises).then(function(data){
+		res.render('authors/show', {author: data[0], books: data[1]})
+	})
 })
 
 module.exports = router;
