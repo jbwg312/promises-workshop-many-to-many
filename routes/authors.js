@@ -18,15 +18,7 @@ function Authors_Books() {
 
 
 router.get('/', function(req, res, next) {
-  // get all authors from Authors
-  // THEN for each author, go get all of their book ids from Authors_Books
-  // THEN go get all that author's books
-  // AND add the array of books to the author object as 'books'
-  // render the appropriate template
-  // pass an array of authors to the view using locals
 
-  // EXAMPLE: { first_name: 'Laura', last_name: 'Lou', bio: 'her bio', books: [ this should be all of her book objects ]}
-		// console.log(authors);
 		var arr = [];
 		Authors().then(function(authors){
 		for (var i = 0; i < authors.length; i++) {
@@ -58,7 +50,7 @@ router.post('/', function (req, res, next) {
   var bookIds = req.body.book_ids.split(",");
   delete req.body.book_ids;
   Authors().returning('id').insert(req.body).then(function (id) {
-    helpers.insertIntoAuthorsBooks(bookIds, Authors_Books, id[0]).then(function () {
+    helpers.insertIntoAuthorsBooks(bookIds, id[0]).then(function () {
       res.redirect('/authors');
     })
   })
@@ -66,7 +58,7 @@ router.post('/', function (req, res, next) {
 
 router.get('/:id/delete', function (req, res, next) {
   Authors().where('id', req.params.id).first().then(function (author) {
-    helpers.getAuthorBooks(author).then(function (authorBooks) {
+    helpers.getAuthorBooks(req.params.id).then(function (authorBooks) {
       Books().select().then(function (books) {
         res.render('authors/delete', {author: author, author_books: authorBooks, books: books });
       })
@@ -84,11 +76,15 @@ router.post('/:id/delete', function (req, res, next) {
 })
 
 router.get('/:id/edit', function (req, res, next) {
-  // find the author in Authors
-  // get all of the authors book_ids from Authors_Books
-  // get all of the authors books from BOOKs
-  // render the corresponding template
-  // use locals to pass books and author to the view
+
+	var promises = [];
+	promises.push(Authors().where({id: req.params.id}).first())
+	promises.push(Authors_Books().join('books', 'books.id', '=', 'authors_books.book_id').where({'authors_books.author_id': req.params.id}).then(function(books){
+		return books
+	}))
+	Promise.all(promises).then(function(data){
+		res.render('authors/edit', {author: data[0],author_books: data[1]})
+	})
 })
 
 router.post('/:id', function (req, res, next) {
@@ -103,21 +99,14 @@ router.post('/:id', function (req, res, next) {
 })
 
 router.get('/:id', function (req, res, next) {
-  // find the author in Authors
-  // get all of the authors book_ids from Authors_Books
-  // get all of the authors books from BOOKs
-  // render the corresponding template
-  // use locals to pass books and author to the view
 	var promises = [];
-	promises.push(Authors().where({id: req.params.id}))
-
-	promises.push(Authors_Books().pluck('book_id').where({author_id: req.params.id}).then(function(bookId){
-			return Books().whereIn('id', bookId).then(function(books){
-				return books;
-		})
+	promises.push(Authors().where({id: req.params.id}).first())
+	promises.push(Authors_Books().join('books', 'books.id', '=', 'authors_books.book_id').where({'authors_books.author_id': req.params.id}).then(function(books){
+		return books
 	}))
 	Promise.all(promises).then(function(data){
-		res.render('authors/show', {author: data[0], books: data[1]})
+
+		res.render('authors/show', {author: data[0],books: data[1]})
 	})
 })
 
